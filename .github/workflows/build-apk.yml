@@ -25,9 +25,6 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Project Dependencies
         run: |
           npm install --legacy-peer-deps
@@ -36,7 +33,7 @@ jobs:
         run: |
           npx vite build
 
-      - name: Install Capacitor & Android Support
+      - name: Setup Capacitor Android
         run: |
           npm install --save-dev --legacy-peer-deps @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "Editor Struk" "com.editorstruk.app" --web-dir dist || true
@@ -45,12 +42,16 @@ jobs:
           fi
           npx cap sync android
 
-      - name: Inject Android Bluetooth & Thermal Printer Permissions
+      - name: Inject Android Bluetooth Permissions
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
             sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.BLUETOOTH" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
           fi
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Grant Execute Permission for Gradlew
         run: |
