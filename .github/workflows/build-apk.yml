@@ -17,20 +17,21 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
-      - name: Set up JDK 17
+      - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'zulu'
+          distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Locate & Prepare Project Files
         run: |
           echo "Memeriksa direktori berkas proyek..."
           ls -la
 
-          # Jika ada berkas ZIP di repo, ekstrak secara otomatis!
+          # Jika pengguna mengunggah berkas zip langsung ke GitHub, ekstrak otomatis
           ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
           if [ -n "$ZIP_FILE" ]; then
             echo "Ditemukan berkas ZIP: $ZIP_FILE. Mengekstrak otomatis..."
@@ -52,9 +53,6 @@ jobs:
             shopt -u dotglob
           fi
 
-          echo "Daftar berkas setelah diekstrak:"
-          ls -la
-
       - name: Install Project Dependencies
         run: |
           npm install --legacy-peer-deps
@@ -63,43 +61,56 @@ jobs:
         run: |
           npx vite build
 
-      - name: Setup Capacitor Android
+      - name: Setup Capacitor 6 (Stable LTS)
         run: |
-          npm install --save-dev --legacy-peer-deps @capacitor/core @capacitor/cli @capacitor/android
+          npm install --save-dev --legacy-peer-deps @capacitor/core@^6.1.0 @capacitor/cli@^6.1.0 @capacitor/android@^6.1.0
           npx cap init "Editor Struk" "com.editorstruk.app" --web-dir dist || true
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+          rm -rf android
+          npx cap add android
           npx cap sync android
 
-      - name: Inject Android Bluetooth Permissions
+      - name: Configure Android SDK Environment & Permissions
         run: |
+          # Buat local.properties mengarah ke Android SDK runner
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          
+          # Inject Permissions Bluetooth & Printer Thermal
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
             sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.BLUETOOTH" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
           fi
 
-      - name: Accept Android SDK Licenses
+      - name: Accept Android Licenses & Ensure Platforms
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Grant Execute Permission for Gradlew
         run: |
           chmod +x ./android/gradlew
 
       - name: Build Debug APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false"
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Rename APK for Clarity
+      - name: Prepare APK Output
         run: |
           mkdir -p output-apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk output-apk/Editor-Struk-v1.0.apk || cp android/app/build/outputs/apk/debug/*.apk output-apk/Editor-Struk.apk
+          APK_FOUND=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -n "$APK_FOUND" ]; then
+            cp "$APK_FOUND" output-apk/Editor-Struk-v1.0.apk
+            echo "APK siap di: output-apk/Editor-Struk-v1.0.apk"
+          else
+            echo "::error::File APK tidak ditemukan di direktori output Gradle!"
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Editor-Struk-APK
-          path: output-apk/*.apk
+          path: output-apk/Editor-Struk-v1.0.apk
           retention-days: 30
