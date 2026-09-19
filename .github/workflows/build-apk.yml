@@ -14,18 +14,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Set up Java JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'gradle'
-
       - name: Locate & Prepare Project Files
         run: |
           echo "Memeriksa direktori berkas proyek..."
@@ -53,6 +41,20 @@ jobs:
             shopt -u dotglob
           fi
 
+          echo "Daftar berkas setelah disiapkan:"
+          ls -la
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Install Project Dependencies
         run: |
           npm install --legacy-peer-deps
@@ -61,7 +63,7 @@ jobs:
         run: |
           npx vite build
 
-      - name: Setup Capacitor 6 (Stable LTS)
+      - name: Setup Capacitor 6 Android
         run: |
           npm install --save-dev --legacy-peer-deps @capacitor/core@^6.1.0 @capacitor/cli@^6.1.0 @capacitor/android@^6.1.0
           npx cap init "Editor Struk" "com.editorstruk.app" --web-dir dist || true
@@ -69,21 +71,18 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Configure Android SDK Environment & Permissions
+      - name: Configure Android SDK & Bluetooth Permissions
         run: |
-          # Buat local.properties mengarah ke Android SDK runner
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-          
-          # Inject Permissions Bluetooth & Printer Thermal
+
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
             sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.BLUETOOTH" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
           fi
 
-      - name: Accept Android Licenses & Ensure Platforms
+      - name: Accept Android SDK Licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Grant Execute Permission for Gradlew
         run: |
@@ -94,7 +93,7 @@ jobs:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false"
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
       - name: Prepare APK Output
         run: |
