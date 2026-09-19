@@ -25,6 +25,24 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
+      - name: Locate & Prepare Project Files
+        run: |
+          echo "Memeriksa direktori berkas proyek..."
+          ls -la
+          PKG_PATH=$(find . -maxdepth 3 -name "package.json" -not -path "*/node_modules/*" | head -n 1)
+          if [ -z "$PKG_PATH" ]; then
+            echo "::error::File package.json tidak ditemukan di repository! Pastikan Anda sudah mengunggah seluruh isi file proyek dari editor-struk.zip ke repo ini (termasuk package.json, index.html, src, dll)."
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$PKG_PATH")
+          echo "Proyek terdeteksi di direktori: $PROJECT_DIR"
+          if [ "$PROJECT_DIR" != "." ]; then
+            echo "Memindahkan berkas dari $PROJECT_DIR ke direktori utama..."
+            shopt -s dotglob
+            cp -r "$PROJECT_DIR"/* .
+            shopt -u dotglob
+          fi
+
       - name: Install Project Dependencies
         run: |
           npm install --legacy-peer-deps
