@@ -29,9 +29,18 @@ jobs:
         run: |
           echo "Memeriksa direktori berkas proyek..."
           ls -la
+
+          # Jika ada berkas ZIP di repo, ekstrak secara otomatis!
+          ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Ditemukan berkas ZIP: $ZIP_FILE. Mengekstrak otomatis..."
+            unzip -o "$ZIP_FILE"
+          fi
+
+          # Cari letak package.json
           PKG_PATH=$(find . -maxdepth 3 -name "package.json" -not -path "*/node_modules/*" | head -n 1)
           if [ -z "$PKG_PATH" ]; then
-            echo "::error::File package.json tidak ditemukan di repository! Pastikan Anda sudah mengunggah seluruh isi file proyek dari editor-struk.zip ke repo ini (termasuk package.json, index.html, src, dll)."
+            echo "::error::File package.json tidak ditemukan! Pastikan file ZIP atau file proyek ada di repo ini."
             exit 1
           fi
           PROJECT_DIR=$(dirname "$PKG_PATH")
@@ -42,6 +51,9 @@ jobs:
             cp -r "$PROJECT_DIR"/* .
             shopt -u dotglob
           fi
+
+          echo "Daftar berkas setelah diekstrak:"
+          ls -la
 
       - name: Install Project Dependencies
         run: |
