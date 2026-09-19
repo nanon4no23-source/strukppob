@@ -71,13 +71,32 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Configure Android SDK & Bluetooth Permissions
+      - name: Apply Custom App Icons & Branding
+        run: |
+          echo "Mengaplikasikan logo kustom aplikasi ke Android..."
+          chmod +x scripts/generate_android_icons.sh
+          ./scripts/generate_android_icons.sh
+
+      - name: Install Android Bluetooth Printer Native Bridge
+        run: |
+          echo "Memasang Java Bridge Printer Bluetooth..."
+          chmod +x scripts/setup_android_bluetooth_bridge.sh
+          ./scripts/setup_android_bluetooth_bridge.sh
+
+      - name: Configure Android Version 1.1, SDK, Permissions & Cleartext
         run: |
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
+          # Naikkan versi aplikasi ke v1.1 di build.gradle dengan script Node.js
+          node scripts/bump_android_version.cjs
+
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
-            sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.BLUETOOTH" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+            # Inject izin lengkap untuk Bluetooth HP & Internet
+            sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.BLUETOOTH" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' "$MANIFEST"
+            
+            # Izinkan cleartext traffic agar request ke API / network berjalan lancar
+            sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' "$MANIFEST"
           fi
 
       - name: Accept Android SDK Licenses
@@ -100,8 +119,8 @@ jobs:
           mkdir -p output-apk
           APK_FOUND=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           if [ -n "$APK_FOUND" ]; then
-            cp "$APK_FOUND" output-apk/Editor-Struk-v1.0.apk
-            echo "APK siap di: output-apk/Editor-Struk-v1.0.apk"
+            cp "$APK_FOUND" output-apk/Editor-Struk-v1.1.apk
+            echo "APK siap di: output-apk/Editor-Struk-v1.1.apk"
           else
             echo "::error::File APK tidak ditemukan di direktori output Gradle!"
             exit 1
@@ -110,6 +129,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Editor-Struk-APK
-          path: output-apk/Editor-Struk-v1.0.apk
+          name: Editor-Struk-v1.1-APK
+          path: output-apk/Editor-Struk-v1.1.apk
           retention-days: 30
